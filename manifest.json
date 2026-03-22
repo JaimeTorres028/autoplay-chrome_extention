@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Canvas Kaltura Autoplay",
+  "version": "1.0.0",
+  "description": "Automatically starts embedded course videos on Canvas and Kaltura pages.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gatech.instructure.com/*",
+        "https://*.instructure.com/*",
+        "https://cdnapisec.kaltura.com/*",
+        "https://*.kaltura.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "page-kaltura.js"
+      ],
+      "matches": [
+        "https://gatech.instructure.com/*",
+        "https://*.instructure.com/*",
+        "https://cdnapisec.kaltura.com/*",
+        "https://*.kaltura.com/*"
+      ]
+    }
+  ]
+}
