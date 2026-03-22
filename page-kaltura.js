@@ -3,6 +3,9 @@
   const RETRY_DELAYS_MS = [0, 500, 1500, 3000, 6000, 10000];
   const BOUND_VIDEO_FLAG = "data-autoplay-extension-ended-bound";
   const ENDED_MESSAGE_TYPE = "canvas-kaltura-autoplay-video-ended";
+  const UNMUTE_DELAYS_MS = [300, 1000, 2500];
+  const PLAY_REQUEST_FLAG = "__canvasKalturaAutoplayPlayRequested";
+  const UNMUTE_REQUEST_FLAG = "__canvasKalturaAutoplayUnmuteRequested";
 
   function pageLog(message, extra) {
     if (extra === undefined) {
@@ -40,19 +43,124 @@
       return false;
     }
 
-    try {
-      player.sendNotification("changeVolume", 0);
-    } catch (error) {
-      pageLog("changeVolume failed", error);
+    if (player[PLAY_REQUEST_FLAG]) {
+      return true;
     }
 
     try {
+      player[PLAY_REQUEST_FLAG] = true;
       player.sendNotification("doPlay");
       pageLog("Triggered Kaltura doPlay");
+      scheduleUnmute(player);
       return true;
     } catch (error) {
+      player[PLAY_REQUEST_FLAG] = false;
       pageLog("doPlay failed", error);
       return false;
+    }
+  }
+
+  function tryUnmutePlayer(player) {
+    if (!player || typeof player.sendNotification !== "function") {
+      return false;
+    }
+
+    let succeeded = false;
+
+    try {
+      player.sendNotification("unmute");
+      succeeded = true;
+    } catch (error) {
+      pageLog("unmute notification failed", error);
+    }
+
+    try {
+      player.sendNotification("changeVolume", 1);
+      succeeded = true;
+    } catch (error) {
+      pageLog("changeVolume(1) failed", error);
+    }
+
+    return succeeded;
+  }
+
+  function tryUnmuteVideoElements() {
+    let changed = false;
+
+    for (const video of document.querySelectorAll("video")) {
+      if (!(video instanceof HTMLVideoElement)) {
+        continue;
+      }
+
+      try {
+        video.muted = false;
+        video.defaultMuted = false;
+        video.volume = 1;
+        changed = true;
+      } catch (error) {
+        pageLog("Failed to update video element mute state", error);
+      }
+    }
+
+    return changed;
+  }
+
+  function tryUnmuteControls() {
+    const selectors = [
+      "#muteBtn",
+      ".icon-volume-mute",
+      "button[aria-label='Unmute']",
+      "button[title='Unmute']"
+    ];
+
+    for (const selector of selectors) {
+      const control = document.querySelector(selector);
+      if (!(control instanceof HTMLElement)) {
+        continue;
+      }
+
+      const label = `${control.getAttribute("aria-label") || ""} ${control.getAttribute("title") || ""}`.toLowerCase();
+      const className = (control.className || "").toString().toLowerCase();
+      const looksLikeUnmute =
+        label.includes("unmute") ||
+        className.includes("volume-mute") ||
+        className.includes("muted");
+
+      if (!looksLikeUnmute) {
+        continue;
+      }
+
+      try {
+        control.click();
+        pageLog("Clicked unmute control", selector);
+        return true;
+      } catch (error) {
+        pageLog("Failed to click unmute control", { selector, error });
+      }
+    }
+
+    return false;
+  }
+
+  function scheduleUnmute(player) {
+    if (player && player[UNMUTE_REQUEST_FLAG]) {
+      return;
+    }
+
+    if (player) {
+      player[UNMUTE_REQUEST_FLAG] = true;
+    }
+
+    for (const delay of UNMUTE_DELAYS_MS) {
+      window.setTimeout(() => {
+        const apiResult = tryUnmutePlayer(player);
+        const videoResult = tryUnmuteVideoElements();
+        const controlResult = tryUnmuteControls();
+
+        if (apiResult || videoResult || controlResult) {
+          pageLog("Attempted player unmute");
+        }
+      }, delay);
     }
   }
 
