@@ -6,6 +6,9 @@
   const ENDED_MESSAGE_TYPE = "canvas-kaltura-autoplay-video-ended";
   const NEXT_ONCE_KEY = `canvas-kaltura-autoplay-next:${window.location.pathname}`;
   const NEXT_NAVIGATION_DELAY_MS = 2000;
+  const PLAYBACK_SPEED_KEY = "playbackSpeed";
+  const DEFAULT_PLAYBACK_SPEED = 1;
+  let preferredPlaybackSpeed = DEFAULT_PLAYBACK_SPEED;
 
   function log(message, extra) {
     if (extra === undefined) {
@@ -18,6 +21,51 @@
 
   function isKalturaPage() {
     return window.location.hostname.includes("kaltura.com");
+  }
+
+  function loadPlaybackSpeedPreference() {
+    try {
+      chrome.storage.sync.get({ [PLAYBACK_SPEED_KEY]: DEFAULT_PLAYBACK_SPEED }, (result) => {
+        const parsed = Number(result[PLAYBACK_SPEED_KEY]);
+        preferredPlaybackSpeed = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PLAYBACK_SPEED;
+        document.documentElement.dataset.canvasKalturaAutoplaySpeed = String(preferredPlaybackSpeed);
+        log("Loaded playback speed preference", preferredPlaybackSpeed);
+      });
+    } catch (error) {
+      log("Failed to load playback speed preference", error);
+      document.documentElement.dataset.canvasKalturaAutoplaySpeed = String(preferredPlaybackSpeed);
+    }
+  }
+
+  function bindPlaybackSpeedPreferenceListener() {
+    if (!chrome.storage || !chrome.storage.onChanged) {
+      return;
+    }
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "sync" || !changes[PLAYBACK_SPEED_KEY]) {
+        return;
+      }
+
+      const parsed = Number(changes[PLAYBACK_SPEED_KEY].newValue);
+      preferredPlaybackSpeed = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PLAYBACK_SPEED;
+      document.documentElement.dataset.canvasKalturaAutoplaySpeed = String(preferredPlaybackSpeed);
+      log("Updated playback speed preference", preferredPlaybackSpeed);
+      document.querySelectorAll("video").forEach(applyPlaybackSpeed);
+    });
+  }
+
+  function applyPlaybackSpeed(video) {
+    if (!(video instanceof HTMLVideoElement)) {
+      return;
+    }
+
+    try {
+      video.playbackRate = preferredPlaybackSpeed;
+      video.defaultPlaybackRate = preferredPlaybackSpeed;
+    } catch (error) {
+      log("Failed to apply playback speed", error);
+    }
   }
 
   function hasNavigatedNextAlready() {
@@ -164,6 +212,7 @@
     video.playsInline = true;
     video.setAttribute("autoplay", "");
     video.setAttribute("playsinline", "");
+    applyPlaybackSpeed(video);
 
     if (video.readyState === 0 && hasPlayableSource(video)) {
       try {
@@ -263,6 +312,7 @@
     }
 
     video.setAttribute(AUTOPLAY_FLAG, "true");
+    applyPlaybackSpeed(video);
 
     let retryTimer = null;
     const rerun = () => {
@@ -292,11 +342,18 @@
       }
     };
 
-    video.addEventListener("loadedmetadata", rerun);
+    video.addEventListener("loadedmetadata", () => {
+      applyPlaybackSpeed(video);
+      rerun();
+    });
     video.addEventListener("loadeddata", rerun);
-    video.addEventListener("canplay", rerun);
+    video.addEventListener("canplay", () => {
+      applyPlaybackSpeed(video);
+      rerun();
+    });
     video.addEventListener("canplaythrough", rerun);
     video.addEventListener("play", () => {
+      applyPlaybackSpeed(video);
       if (video.paused) {
         rerun();
       }
@@ -337,6 +394,8 @@
   }
 
   function init() {
+    loadPlaybackSpeedPreference();
+    bindPlaybackSpeedPreferenceListener();
     injectPageScript();
     bindEndedNavigationListener();
     bindExistingVideos();

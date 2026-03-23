@@ -1,6 +1,6 @@
 # Canvas Kaltura Autoplay
 
-This Chrome extension automatically starts videos on Canvas pages that embed Kaltura players, attempts to start them with audio unmuted, and can move to the next Canvas module item after a video finishes.
+This Chrome extension automatically starts videos on Canvas pages that embed Kaltura players, attempts to start them with audio unmuted, lets you choose a default playback speed, and can move to the next Canvas module item after a video finishes.
 
 ## Install
 
@@ -15,9 +15,16 @@ This Chrome extension automatically starts videos on Canvas pages that embed Kal
 - Watches for late-loaded players and videos.
 - Uses the Kaltura player API to start embedded videos.
 - Attempts to unmute the Kaltura player after autoplay starts.
+- Lets you choose a default playback speed from the extension popup.
 - Falls back to generic autoplay behavior on non-Kaltura video pages that match the extension.
 - When a Kaltura video ends, it navigates to the Canvas `Next Module Item` link once.
 - Waits 2 seconds before moving to the next module item.
+
+## Playback Speed
+
+1. Click the extension icon in Chrome.
+2. Choose a default playback speed.
+3. Reload the video page if it is already open.
 
 ## Notes
 

@@ -6,6 +6,8 @@
   const UNMUTE_DELAYS_MS = [300, 1000, 2500];
   const PLAY_REQUEST_FLAG = "__canvasKalturaAutoplayPlayRequested";
   const UNMUTE_REQUEST_FLAG = "__canvasKalturaAutoplayUnmuteRequested";
+  const PLAYBACK_SPEED_ATTRIBUTE = "data-canvas-kaltura-autoplay-speed";
+  const DEFAULT_PLAYBACK_SPEED = 1;
 
   function pageLog(message, extra) {
     if (extra === undefined) {
@@ -38,6 +40,44 @@
     return [...new Set(candidates)];
   }
 
+  function getPreferredPlaybackSpeed() {
+    const raw = document.documentElement.getAttribute(PLAYBACK_SPEED_ATTRIBUTE);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PLAYBACK_SPEED;
+  }
+
+  function applyPlaybackSpeed(player) {
+    const speed = getPreferredPlaybackSpeed();
+    let changed = false;
+
+    if (player && typeof player.sendNotification === "function") {
+      try {
+        player.sendNotification("doSpeedChange", speed);
+        changed = true;
+      } catch (error) {
+        pageLog("doSpeedChange failed", error);
+      }
+    }
+
+    for (const video of document.querySelectorAll("video")) {
+      if (!(video instanceof HTMLVideoElement)) {
+        continue;
+      }
+
+      try {
+        video.playbackRate = speed;
+        video.defaultPlaybackRate = speed;
+        changed = true;
+      } catch (error) {
+        pageLog("Failed to apply video playback rate", error);
+      }
+    }
+
+    if (changed) {
+      pageLog("Applied playback speed", speed);
+    }
+  }
+
   function tryPlayerApi(player) {
     if (!player || typeof player.sendNotification !== "function") {
       return false;
@@ -51,6 +91,7 @@
       player[PLAY_REQUEST_FLAG] = true;
       player.sendNotification("doPlay");
       pageLog("Triggered Kaltura doPlay");
+      schedulePlaybackSpeed(player);
       scheduleUnmute(player);
       return true;
     } catch (error) {
@@ -164,6 +205,14 @@
     }
   }
 
+  function schedulePlaybackSpeed(player) {
+    for (const delay of UNMUTE_DELAYS_MS) {
+      window.setTimeout(() => {
+        applyPlaybackSpeed(player);
+      }, delay);
+    }
+  }
+
   function tryAllPlayers() {
     let started = false;
 
@@ -204,6 +253,8 @@
 
     video.setAttribute(BOUND_VIDEO_FLAG, "true");
     video.addEventListener("ended", notifyParentVideoEnded, { once: true });
+    video.addEventListener("loadedmetadata", () => applyPlaybackSpeed(null));
+    video.addEventListener("play", () => applyPlaybackSpeed(null));
     pageLog("Bound ended listener to video element");
   }
 

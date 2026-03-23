@@ -3,6 +3,13 @@
   "name": "Canvas Kaltura Autoplay",
   "version": "1.0.0",
   "description": "Automatically starts embedded course videos on Canvas and Kaltura pages.",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_title": "Canvas Kaltura Autoplay",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": [
